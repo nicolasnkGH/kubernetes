@@ -1,0 +1,35 @@
+---
+- name: Install Required Dependencies
+  hosts: all
+  become: yes
+  become_method: sudo
+  gather_facts: yes
+  vars:
+    ansible_user: ubuntu
+    ansible_become_password: "{{ ansible_become_password }}"
+
+  tasks:
+    - name: Update package lists
+      apt:
+        update_cache: yes
+
+    - name: Install required packages
+      apt:
+        name: "{{ item }}"
+        state: present
+      with_items:
+        - curl
+        - wget
+        - gzip
+        - tar
+        - xz-utils
+        - gnupg
+        - ca-certificates
+        - apt-transport-https
+        - software-properties-common
+        - python3-pip
+        - python3-apt
+        - sshpass
+        - podman
+        - nfs-common
+        - cifs-utils
