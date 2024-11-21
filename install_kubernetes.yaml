@@ -1,0 +1,81 @@
+---
+- name: Install RKE2 and Validate Installation
+  hosts: rke2_servers  # Replace with your controller node group
+  become: true
+  tasks:
+    # Check for existing RKE2 installation (unchanged)
+    - name: Check RKE2 installation
+      command: rke2 --version
+      register: rke2_installed
+      failed_when: false
+      changed_when: false
+      check_mode: false
+
+    # Download and install RKE2 with configuration file (optional)
+    - name: Install RKE2 with configuration
+      command: rke2 up --config /path/to/your/rke2_config.yaml
+      when: rke2_installed.rc != 0
+
+    # Verify RKE2 Service is active (unchanged)
+    - name: Ensure RKE2 service is active
+      systemd:
+        name: rke2-server.service
+        state: started
+        enabled: yes
+      register: rke2_service
+      failed_when: rke2_service.status is defined and rke2_service.status == "inactive"
+
+    # Validate RKE2 API Server is responding (unchanged)
+    - name: Check RKE2 API Server response
+      uri:
+        url: https://localhost:6443/healthz
+        method: GET
+        validate_certs: no
+      register: api_response
+      retries: 5
+      delay: 10
+      until: api_response.status == 200
+      become: false
+      ignore_errors: true
+
+  handlers:
+    - name: Start RKE2 Service (unchanged)
+      systemd:
+        name: rke2-server.service
+        state: started
+        enabled: yes
+      listen: rke2_service
+
+- name: Install k9s on Controller Node
+  hosts: controller_node  # Replace with your controller node group
+  become: true
+  tasks:
+    # Determine OS Architecture (unchanged)
+    - name: Determine OS Architecture
+      ansible.builtin.set_fact:
+        os_arch: "{{ ansible_architecture }}"
+
+    # Download k9s for Linux (conditional based on os_arch)
+    - name: Download k9s for Linux x86_64
+      get_url:
+        url: https://github.com/derailed/k9s/releases/latest/download/k9s_Linux_x86_64.tar.gz
+        dest: "/tmp/k9s_x86_64.tar.gz"
+      when: os_arch == "x86_64"
+
+    - name: Download k9s for Linux arm64
+      get_url:
+        url: https://github.com/derailed/k9s/releases/latest/download/k9s_Linux_arm64.tar.gz
+        dest: "/tmp/k9s_arm64.tar.gz"
+      when: os_arch == "aarch64"
+
+    # Unarchive k9s (unchanged)
+    - name: Unarchive k9s (x86_64)
+      unarchive:
+        src: "/tmp/k9s_x86_64.tar.gz"
+        dest: "/usr/local/bin"
+        remote_src: yes
+        extra_opts: [--strip-components=1]
+      when: os_arch == "x86_64"
+
+    - name: Unarchive k9s (arm64)
+      unarchive:
